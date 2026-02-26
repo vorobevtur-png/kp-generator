@@ -243,6 +243,7 @@ async def generate_kp(
         content_lines = []
         for idx, (name, section_text) in enumerate(sections, start=1):
             # Определяем исходный префикс
+            old_prefix = ""
             if name == "ИГИ":
                 old_prefix = "1."
             elif name == "ИГДИ":
@@ -251,19 +252,22 @@ async def generate_kp(
                 old_prefix = "3."
             elif name == "ИГМИ":
                 old_prefix = "4."
-            else:
-                old_prefix = "1."
 
             # Заменяем все вхождения старого префикса на новый
             new_section = section_text.replace(old_prefix, f"{idx}.")
+
             # Также заменяем упоминания "п.1", "п.2" и т.д.
-            new_section = new_section.replace("п.1", f"п.{idx}")
-            new_section = new_section.replace("п. 2", f"п. {idx}")
-            new_section = new_section.replace("п.2", f"п.{idx}")
-            new_section = new_section.replace("п. 3", f"п. {idx}")
-            new_section = new_section.replace("п.3", f"п.{idx}")
-            new_section = new_section.replace("п. 4", f"п. {idx}")
-            new_section = new_section.replace("п.4", f"п.{idx}")
+            replacements = [
+                ("п.1", f"п.{idx}"),
+                ("п. 2", f"п. {idx}"),
+                ("п.2", f"п.{idx}"),
+                ("п. 3", f"п. {idx}"),
+                ("п.3", f"п.{idx}"),
+                ("п. 4", f"п. {idx}"),
+                ("п.4", f"п.{idx}")
+            ]
+            for old, new in replacements:
+                new_section = new_section.replace(old, new)
 
             # Добавляем номер к заголовку
             lines = new_section.split("\n")
