@@ -17,7 +17,7 @@ def format_cost(cost_str):
         return "0"
 
 def build_igi_section(data):
-    return f"""1. Комплекс инженерно-геологических изысканий:
+    return f"""Комплекс инженерно-геологических изысканий:
 1.1. Полевые работы:
 — бурение скважин глубиной по {data['igi_drilling_depth']} м – {data['igi_boreholes']} скважин;
 — статическое зондирование грунтов – {data['igi_sounding_points']} точки;
@@ -37,7 +37,7 @@ def build_igi_section(data):
 Стоимость работ по п.1 составит: {data['igi_cost']} руб. с учетом НДС."""
 
 def build_igdi_section(data):
-    return f"""2. Комплекс инженерно-геодезических изысканий:
+    return f"""Комплекс инженерно-геодезических изысканий:
 2.1. Топографо-геодезическая съемка участка, общей площадью {data['igdi_area_ha']} Га;
 2.2. Выполнение в пределах границ топографической съемки полевого обследования и съемки всех наземных, надземных и подземных коммуникаций, определение их типа, характеристики, глубины заложения;
 2.3. Камеральная обработка результатов съемки и оформление топографического плана в масштабе {data['igdi_scale']}, сечение рельефа через {data['igdi_contour_interval']} м;
@@ -54,7 +54,7 @@ def build_igdi_section(data):
 * В составе работ подача в ИСОГД"""
 
 def build_iei_section(data):
-    return f"""3. Комплекс инженерно-экологических изысканий:
+    return f"""Комплекс инженерно-экологических изысканий:
 3.1. Полевые работы:
 - маршрутные наблюдения {data['iei_area_ha']} га;
 - пешеходная гамма-съемка участка {data['iei_area_ha']} га;
@@ -99,7 +99,7 @@ def build_iei_section(data):
 - биотестирование почво-грунтов с целью их экотоксикологической оценки и определения класса опасности отходов грунта."""
 
 def build_igmi_section(data):
-    return f"""4. Комплекс гидрометеорологических изысканий:
+    return f"""Комплекс гидрометеорологических изысканий:
 4.1. Полевые работы:
 - рекогносцировочное обследование, кат. сложности II – {data['igmi_route_km']} км;
 - фотоработы – {data['igmi_photo_count']} снимков.
@@ -178,7 +178,6 @@ async def generate_kp(
     igmi_cost: str = "0"
 ):
     try:
-        # Подготовка данных
         data = {
             "object_name": object_name,
             "address": address,
@@ -229,26 +228,46 @@ async def generate_kp(
             "igmi_cost": format_cost(igmi_cost)
         }
 
-        # Сборка контента
+        # Сборка активных разделов
         sections = []
         if igi == "1":
-            sections.append(build_igi_section(data))
+            sections.append(("ИГИ", build_igi_section(data)))
         if igdi == "1":
-            sections.append(build_igdi_section(data))
+            sections.append(("ИГДИ", build_igdi_section(data)))
         if iei == "1":
-            sections.append(build_iei_section(data))
+            sections.append(("ИЭИ", build_iei_section(data)))
         if igmi == "1":
-            sections.append(build_igmi_section(data))
+            sections.append(("ИГМИ", build_igmi_section(data)))
 
-        # Перенумерация
+        # Формирование контента с перенумерацией
         content_lines = []
-        for i, section in enumerate(sections, start=1):
-            # Заменяем первый номер на новый
-            lines = section.split("\n")
-            first_line = lines[0]
-            if "." in first_line:
-                new_first = f"{i}." + first_line[first_line.find("."):]
-                lines[0] = new_first
+        for idx, (name, section_text) in enumerate(sections, start=1):
+            # Определяем исходный префикс
+            if name == "ИГИ":
+                old_prefix = "1."
+            elif name == "ИГДИ":
+                old_prefix = "2."
+            elif name == "ИЭИ":
+                old_prefix = "3."
+            elif name == "ИГМИ":
+                old_prefix = "4."
+            else:
+                old_prefix = "1."
+
+            # Заменяем все вхождения старого префикса на новый
+            new_section = section_text.replace(old_prefix, f"{idx}.")
+            # Также заменяем упоминания "п.1", "п.2" и т.д.
+            new_section = new_section.replace("п.1", f"п.{idx}")
+            new_section = new_section.replace("п. 2", f"п. {idx}")
+            new_section = new_section.replace("п.2", f"п.{idx}")
+            new_section = new_section.replace("п. 3", f"п. {idx}")
+            new_section = new_section.replace("п.3", f"п.{idx}")
+            new_section = new_section.replace("п. 4", f"п. {idx}")
+            new_section = new_section.replace("п.4", f"п.{idx}")
+
+            # Добавляем номер к заголовку
+            lines = new_section.split("\n")
+            lines[0] = f"{idx}. {lines[0]}"
             content_lines.extend(lines)
             content_lines.append("")  # пустая строка между разделами
 
@@ -263,17 +282,17 @@ async def generate_kp(
 
         # Замена меток
         for paragraph in doc.paragraphs:
-            if "{{content}}" in paragraph.text:
-                paragraph.text = paragraph.text.replace("{{content}}", content)
+            text = paragraph.text
+            if "{{content}}" in text:
+                paragraph.text = text.replace("{{content}}", content)
             else:
-                text = paragraph.text
                 for key, value in data.items():
                     placeholder = f"{{{{{key}}}}}"
                     if placeholder in text:
                         text = text.replace(placeholder, str(value))
                 paragraph.text = text
 
-        # Сохранение файла
+        # Сохранение
         safe_name = "".join(c for c in object_name if c.isalnum() or c in " _-")
         filename = f"KP_{safe_name}_{datetime.now().strftime('%Y%m%d')}.docx"
         output_path = f"/tmp/{filename}"
@@ -302,10 +321,7 @@ async def generate_kp(
 
             file_id = str(upload_result["result"]["ID"])
 
-        # Формирование ссылки
         download_url = f"https://izyskaniya.bitrix24.ru/disk/showFile/{file_id}/?filename={filename}"
-
-        # Удаление временного файла
         os.remove(output_path)
 
         return {
