@@ -2,12 +2,11 @@ from fastapi import FastAPI, HTTPException
 from docx import Document
 import httpx
 import os
-import re
 from datetime import datetime
 
 app = FastAPI()
 
-# === Bitrix24 настройки (из вашего скрипта) ===
+# === Bitrix24 настройки ===
 WEBHOOK = "https://izyskaniya.bitrix24.ru/rest/13614/rj3pqolk1fiu6hfr/"
 DISK_FOLDER_ID = "1706930"
 
@@ -144,33 +143,35 @@ async def generate_kp(
             paragraph.text = text
 
         # Сохранение файла
-        filename = f"KP_{object_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.docx"
+        safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in object_name)
+        filename = f"KP_{safe_name}_{datetime.now().strftime('%Y%m%d')}.docx"
         output_path = f"/tmp/{filename}"
         doc.save(output_path)
 
         # === Загрузка в Bitrix24 Диск ===
-        # Этап 1: получить uploadUrl
-        prep_resp = await httpx.post(
-            f"{WEBHOOK}disk.folder.uploadfile.json",
-            data={"id": DISK_FOLDER_ID}
-        )
-        prep_data = prep_resp.json()
-        if "result" not in prep_data or "uploadUrl" not in prep_data["result"]:
-            raise HTTPException(status_code=500, detail="Не удалось получить uploadUrl от Bitrix24")
+        async with httpx.AsyncClient(timeout=30) as client:
+            # Этап 1: получить uploadUrl
+            prep_resp = await client.post(
+                f"{WEBHOOK}disk.folder.uploadfile.json",
+                data={"id": DISK_FOLDER_ID}
+            )
+            prep_data = prep_resp.json()
+            if "result" not in prep_data or "uploadUrl" not in prep_data["result"]:
+                raise HTTPException(status_code=500, detail="Не удалось получить uploadUrl от Bitrix24")
 
-        upload_url = prep_data["result"]["uploadUrl"]
-        field_name = prep_data["result"].get("field", "file")
+            upload_url = prep_data["result"]["uploadUrl"]
+            field_name = prep_data["result"].get("field", "file")
 
-        # Этап 2: загрузить файл
-        with open(output_path, "rb") as f:
-            files = {field_name: (filename, f, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
-            upload_resp = await httpx.post(upload_url, files=files)
+            # Этап 2: загрузить файл
+            with open(output_path, "rb") as f:
+                files = {field_name: (filename, f, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
+                upload_resp = await client.post(upload_url, files=files)
 
-        upload_result = upload_resp.json()
-        if "result" not in upload_result:
-            raise HTTPException(status_code=500, detail="Ошибка загрузки файла в Bitrix24")
+            upload_result = upload_resp.json()
+            if "result" not in upload_result:
+                raise HTTPException(status_code=500, detail="Ошибка загрузки файла в Bitrix24")
 
-        file_id = str(upload_result["result"]["ID"])
+            file_id = str(upload_result["result"]["ID"])
 
         # Формирование ссылки
         download_url = f"https://izyskaniya.bitrix24.ru/disk/showFile/{file_id}/?filename={filename}"
@@ -178,7 +179,6 @@ async def generate_kp(
         # Удаление временного файла
         os.remove(output_path)
 
-        # Возврат ссылки ассистенту
         return {
             "status": "success",
             "message": f"📄 КП готов! Скачать можно по ссылке: {download_url}",
