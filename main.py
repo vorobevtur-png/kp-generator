@@ -16,16 +16,16 @@ def format_cost(cost_str):
     except (ValueError, TypeError):
         return "0"
 
-def remove_section(doc, start_text, end_text):
-    """Удаляет все параграфы между start_text и end_text (включительно)"""
+def remove_section(doc, start_marker, end_marker):
+    """Удаляет все параграфы между start_marker и end_marker (включительно)"""
     paragraphs_to_remove = []
     in_section = False
     for para in doc.paragraphs:
-        if start_text in para.text:
+        if start_marker in para.text:
             in_section = True
         if in_section:
             paragraphs_to_remove.append(para)
-        if end_text in para.text and in_section:
+        if end_marker in para.text and in_section:
             in_section = False
             break
     for para in paragraphs_to_remove:
