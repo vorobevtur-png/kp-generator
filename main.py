@@ -1,17 +1,20 @@
+import logging
 from fastapi import FastAPI, HTTPException
 from docx import Document
 import httpx
 import os
 from datetime import datetime
 
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("kp_generator")
+
 app = FastAPI()
 
-# === ИСПРАВЛЕНО: убраны пробелы в конце URL ===
 WEBHOOK = "https://izyskaniya.bitrix24.ru/rest/13614/rj3pqolk1fiu6hfr/"
 DISK_FOLDER_ID = "1706930"
 
 def format_cost(cost_str):
-    """Безопасное форматирование стоимости: '100000' → '100 000'"""
     try:
         return f"{int(cost_str):,}".replace(",", " ")
     except (ValueError, TypeError):
@@ -26,14 +29,12 @@ async def generate_kp(
     total_cost: str = "0",
     advance_percent: str = "50",
     validity_days: str = "30",
-    # ИГИ
     igi: str = "0",
     igi_drilling_depth: str = "5",
     igi_boreholes: str = "4",
     igi_sounding_points: str = "4",
     igi_duration_days: str = "35",
     igi_cost: str = "0",
-    # ИГДИ
     igdi: str = "0",
     igdi_area_ha: str = "0",
     igdi_scale: str = "1:500",
@@ -45,7 +46,6 @@ async def generate_kp(
     igdi_survey_cost: str = "0",
     igdi_coordination_cost: str = "0",
     igdi_report_cost: str = "0",
-    # ИЭИ
     iei: str = "0",
     iei_area_ha: str = "0",
     iei_gamma_points: str = "0",
@@ -67,7 +67,6 @@ async def generate_kp(
     iei_pits: str = "0",
     iei_duration_days: str = "35",
     iei_cost: str = "0",
-    # ИГМИ
     igmi: str = "0",
     igmi_route_km: str = "0",
     igmi_photo_count: str = "0",
@@ -75,8 +74,10 @@ async def generate_kp(
     igmi_duration_days: str = "40",
     igmi_cost: str = "0"
 ):
+    logger.info("=== Начало обработки запроса ===")
+    logger.info(f"Получено: object_name='{object_name}', address='{address}', igdi={igdi}")
+
     try:
-        # Подготовка данных
         data = {
             "object_name": object_name,
             "address": address,
@@ -131,14 +132,16 @@ async def generate_kp(
             "igmi_cost": format_cost(igmi_cost)
         }
 
-        # === ИСПРАВЛЕНО: надёжный путь к шаблону ===
         template_path = os.path.join(os.path.dirname(__file__), "templates", "kp_template.docx")
+        logger.info(f"Путь к шаблону: {template_path}")
         if not os.path.exists(template_path):
+            logger.error("Шаблон КП не найден!")
             raise HTTPException(status_code=400, detail="Шаблон КП не найден")
 
+        logger.info("Загружаем шаблон...")
         doc = Document(template_path)
 
-        # Замена меток
+        logger.info("Выполняем замену меток...")
         for paragraph in doc.paragraphs:
             text = paragraph.text
             for key, value in data.items():
@@ -149,42 +152,41 @@ async def generate_kp(
                     text = text.replace(placeholder, str(value))
             paragraph.text = text
 
-        # Генерация имени файла
         safe_name = "".join(c for c in object_name if c.isalnum() or c in " _-")
         filename = f"KP_{safe_name}_{datetime.now().strftime('%Y%m%d')}.docx"
         output_path = f"/tmp/{filename}"
         doc.save(output_path)
+        logger.info(f"Файл сохранён: {output_path}")
 
         # === Загрузка в Bitrix24 ===
+        logger.info("Начинаем загрузку в Bitrix24...")
         async with httpx.AsyncClient(timeout=30) as client:
-            # Этап 1: получить uploadUrl
             prep_resp = await client.post(
                 f"{WEBHOOK}disk.folder.uploadfile.json",
                 data={"id": DISK_FOLDER_ID}
             )
             prep_data = prep_resp.json()
+            logger.info(f"Ответ от Bitrix24 (prep): {prep_data}")
             if "result" not in prep_data or "uploadUrl" not in prep_data["result"]:
                 raise HTTPException(status_code=500, detail="Не удалось получить uploadUrl от Bitrix24")
 
             upload_url = prep_data["result"]["uploadUrl"]
             field_name = prep_data["result"].get("field", "file")
 
-            # Этап 2: загрузить файл
             with open(output_path, "rb") as f:
                 files = {field_name: (filename, f, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
                 upload_resp = await client.post(upload_url, files=files)
 
             upload_result = upload_resp.json()
+            logger.info(f"Ответ от Bitrix24 (upload): {upload_result}")
             if "result" not in upload_result:
                 raise HTTPException(status_code=500, detail="Ошибка загрузки файла в Bitrix24")
 
             file_id = str(upload_result["result"]["ID"])
 
-        # === ИСПРАВЛЕНО: убраны пробелы в ссылке ===
         download_url = f"https://izyskaniya.bitrix24.ru/disk/showFile/{file_id}/?filename={filename}"
-
-        # Удаление временного файла
         os.remove(output_path)
+        logger.info(f"Готово! Ссылка: {download_url}")
 
         return {
             "status": "success",
@@ -193,4 +195,5 @@ async def generate_kp(
         }
 
     except Exception as e:
+        logger.exception("Критическая ошибка:")
         raise HTTPException(status_code=500, detail=str(e))
