@@ -128,14 +128,12 @@ async def generate_kp(
     total_cost: str = "0",
     advance_percent: str = "50",
     validity_days: str = "30",
-    # ИГИ
     igi: str = "0",
     igi_drilling_depth: str = "5",
     igi_boreholes: str = "4",
     igi_sounding_points: str = "4",
     igi_duration_days: str = "35",
     igi_cost: str = "0",
-    # ИГДИ
     igdi: str = "0",
     igdi_area_ha: str = "0",
     igdi_scale: str = "1:500",
@@ -147,7 +145,6 @@ async def generate_kp(
     igdi_survey_cost: str = "0",
     igdi_coordination_cost: str = "0",
     igdi_report_cost: str = "0",
-    # ИЭИ
     iei: str = "0",
     iei_area_ha: str = "0",
     iei_gamma_points: str = "0",
@@ -169,7 +166,6 @@ async def generate_kp(
     iei_pits: str = "0",
     iei_duration_days: str = "35",
     iei_cost: str = "0",
-    # ИГМИ
     igmi: str = "0",
     igmi_route_km: str = "0",
     igmi_photo_count: str = "0",
@@ -228,7 +224,6 @@ async def generate_kp(
             "igmi_cost": format_cost(igmi_cost)
         }
 
-        # Сборка активных разделов
         sections = []
         if igi == "1":
             sections.append(("ИГИ", build_igi_section(data)))
@@ -239,52 +234,31 @@ async def generate_kp(
         if igmi == "1":
             sections.append(("ИГМИ", build_igmi_section(data)))
 
-        # Формирование контента с перенумерацией
         content_lines = []
-        for idx, (name, section_text) in enumerate(sections, start=1):
+        for idx, (name, text) in enumerate(sections, start=1):
             # Определяем исходный префикс
-            old_prefix = ""
-            if name == "ИГИ":
-                old_prefix = "1."
-            elif name == "ИГДИ":
-                old_prefix = "2."
-            elif name == "ИЭИ":
-                old_prefix = "3."
-            elif name == "ИГМИ":
-                old_prefix = "4."
+            prefix_map = {"ИГИ": "1.", "ИГДИ": "2.", "ИЭИ": "3.", "ИГМИ": "4."}
+            old_prefix = prefix_map.get(name, "1.")
+            new_text = text.replace(old_prefix, f"{idx}.")
 
-            # Заменяем все вхождения старого префикса на новый
-            new_section = section_text.replace(old_prefix, f"{idx}.")
+            # Замена упоминаний "п.1", "п.2" и т.д.
+            for old_num in ["1", "2", "3", "4"]:
+                new_text = new_text.replace(f"п.{old_num}", f"п.{idx}")
+                new_text = new_text.replace(f"п. {old_num}", f"п. {idx}")
 
-            # Также заменяем упоминания "п.1", "п.2" и т.д.
-            replacements = [
-                ("п.1", f"п.{idx}"),
-                ("п. 2", f"п. {idx}"),
-                ("п.2", f"п.{idx}"),
-                ("п. 3", f"п. {idx}"),
-                ("п.3", f"п.{idx}"),
-                ("п. 4", f"п. {idx}"),
-                ("п.4", f"п.{idx}")
-            ]
-            for old, new in replacements:
-                new_section = new_section.replace(old, new)
-
-            # Добавляем номер к заголовку
-            lines = new_section.split("\n")
+            lines = new_text.split("\n")
             lines[0] = f"{idx}. {lines[0]}"
             content_lines.extend(lines)
-            content_lines.append("")  # пустая строка между разделами
+            content_lines.append("")
 
         content = "\n".join(content_lines).strip()
 
-        # Загрузка шаблона
         template_path = os.path.join(os.path.dirname(__file__), "templates", "kp_template.docx")
         if not os.path.exists(template_path):
             raise HTTPException(status_code=400, detail="Шаблон КП не найден")
 
         doc = Document(template_path)
 
-        # Замена меток
         for paragraph in doc.paragraphs:
             text = paragraph.text
             if "{{content}}" in text:
@@ -296,13 +270,11 @@ async def generate_kp(
                         text = text.replace(placeholder, str(value))
                 paragraph.text = text
 
-        # Сохранение
         safe_name = "".join(c for c in object_name if c.isalnum() or c in " _-")
         filename = f"KP_{safe_name}_{datetime.now().strftime('%Y%m%d')}.docx"
         output_path = f"/tmp/{filename}"
         doc.save(output_path)
 
-        # Загрузка в Bitrix24
         async with httpx.AsyncClient(timeout=30) as client:
             prep_resp = await client.post(
                 f"{WEBHOOK}disk.folder.uploadfile.json",
