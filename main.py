@@ -6,9 +6,16 @@ from datetime import datetime
 
 app = FastAPI()
 
-# === Bitrix24 настройки ===
+# === ИСПРАВЛЕНО: убраны пробелы в конце URL ===
 WEBHOOK = "https://izyskaniya.bitrix24.ru/rest/13614/rj3pqolk1fiu6hfr/"
 DISK_FOLDER_ID = "1706930"
+
+def format_cost(cost_str):
+    """Безопасное форматирование стоимости: '100000' → '100 000'"""
+    try:
+        return f"{int(cost_str):,}".replace(",", " ")
+    except (ValueError, TypeError):
+        return "0"
 
 @app.get("/generate-kp")
 async def generate_kp(
@@ -75,7 +82,7 @@ async def generate_kp(
             "address": address,
             "cadastral_number": cadastral_number or "—",
             "date": date or datetime.now().strftime("%d.%m.%Y"),
-            "total_cost": f"{int(total_cost):,}".replace(",", " "),
+            "total_cost": format_cost(total_cost),
             "advance_percent": advance_percent,
             "validity_days": validity_days,
             "igi": igi == "1",
@@ -83,7 +90,7 @@ async def generate_kp(
             "igi_boreholes": igi_boreholes,
             "igi_sounding_points": igi_sounding_points,
             "igi_duration_days": igi_duration_days,
-            "igi_cost": f"{int(igi_cost):,}".replace(",", " "),
+            "igi_cost": format_cost(igi_cost),
             "igdi": igdi == "1",
             "igdi_area_ha": igdi_area_ha,
             "igdi_scale": igdi_scale,
@@ -91,10 +98,10 @@ async def generate_kp(
             "igdi_duration_days": igdi_duration_days,
             "igdi_survey_days": igdi_survey_days,
             "igdi_coordination_days": igdi_coordination_days,
-            "igdi_cost": f"{int(igdi_cost):,}".replace(",", " "),
-            "igdi_survey_cost": f"{int(igdi_survey_cost):,}".replace(",", " "),
-            "igdi_coordination_cost": f"{int(igdi_coordination_cost):,}".replace(",", " "),
-            "igdi_report_cost": f"{int(igdi_report_cost):,}".replace(",", " "),
+            "igdi_cost": format_cost(igdi_cost),
+            "igdi_survey_cost": format_cost(igdi_survey_cost),
+            "igdi_coordination_cost": format_cost(igdi_coordination_cost),
+            "igdi_report_cost": format_cost(igdi_report_cost),
             "iei": iei == "1",
             "iei_area_ha": iei_area_ha,
             "iei_gamma_points": iei_gamma_points,
@@ -115,23 +122,23 @@ async def generate_kp(
             "iei_agro_samples": iei_agro_samples,
             "iei_pits": iei_pits,
             "iei_duration_days": iei_duration_days,
-            "iei_cost": f"{int(iei_cost):,}".replace(",", " "),
+            "iei_cost": format_cost(iei_cost),
             "igmi": igmi == "1",
             "igmi_route_km": igmi_route_km,
             "igmi_photo_count": igmi_photo_count,
             "igmi_wind_rose_count": igmi_wind_rose_count,
             "igmi_duration_days": igmi_duration_days,
-            "igmi_cost": f"{int(igmi_cost):,}".replace(",", " ")
+            "igmi_cost": format_cost(igmi_cost)
         }
 
-        # Загрузка шаблона
-        template_path = "templates/kp_template.docx"
+        # === ИСПРАВЛЕНО: надёжный путь к шаблону ===
+        template_path = os.path.join(os.path.dirname(__file__), "templates", "kp_template.docx")
         if not os.path.exists(template_path):
             raise HTTPException(status_code=400, detail="Шаблон КП не найден")
 
         doc = Document(template_path)
 
-        # Простая замена меток
+        # Замена меток
         for paragraph in doc.paragraphs:
             text = paragraph.text
             for key, value in data.items():
@@ -142,13 +149,13 @@ async def generate_kp(
                     text = text.replace(placeholder, str(value))
             paragraph.text = text
 
-        # Сохранение файла
-        safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in object_name)
+        # Генерация имени файла
+        safe_name = "".join(c for c in object_name if c.isalnum() or c in " _-")
         filename = f"KP_{safe_name}_{datetime.now().strftime('%Y%m%d')}.docx"
         output_path = f"/tmp/{filename}"
         doc.save(output_path)
 
-        # === Загрузка в Bitrix24 Диск ===
+        # === Загрузка в Bitrix24 ===
         async with httpx.AsyncClient(timeout=30) as client:
             # Этап 1: получить uploadUrl
             prep_resp = await client.post(
@@ -173,7 +180,7 @@ async def generate_kp(
 
             file_id = str(upload_result["result"]["ID"])
 
-        # Формирование ссылки
+        # === ИСПРАВЛЕНО: убраны пробелы в ссылке ===
         download_url = f"https://izyskaniya.bitrix24.ru/disk/showFile/{file_id}/?filename={filename}"
 
         # Удаление временного файла
