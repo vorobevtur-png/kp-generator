@@ -11,10 +11,6 @@ WEBHOOK = "https://izyskaniya.bitrix24.ru/rest/13614/rj3pqolk1fiu6hfr/"
 DISK_FOLDER_ID = "1706930"
 KP_LINK_FIELD = "UF_CRM_1761672766812"  # Поле для ссылки на КП
 
-def clean_param(value, default="0"):
-    """Заменяет пустую строку или None на значение по умолчанию"""
-    return default if value == "" or value is None else value
-
 def format_cost(cost_str):
     try:
         return f"{int(float(cost_str)):,}".replace(",", " ")
@@ -138,9 +134,9 @@ def build_igmi_section(data):
 
 @app.get("/generate-kp")
 async def generate_kp(
-    deal_id: str,
-    object_name: str,
-    address: str,
+    deal_id: str = "",
+    object_name: str = "",
+    address: str = "",
     cadastral_number: str = "",
     date: str = None,
     total_cost: str = "0",
@@ -192,54 +188,54 @@ async def generate_kp(
     igmi_cost: str = "0"
 ):
     try:
-        # Очистка параметров от пустых значений
+        # Подготовка данных
         data = {
-            "object_name": object_name,
-            "address": address,
-            "cadastral_number": cadastral_number if cadastral_number not in ("", None) else "—",
+            "object_name": object_name or "—",
+            "address": address or "—",
+            "cadastral_number": cadastral_number or "—",
             "date": date or datetime.now().strftime("%d.%m.%Y"),
             "total_cost": format_cost(total_cost),
-            "advance_percent": clean_param(advance_percent, "50"),
-            "validity_days": clean_param(validity_days, "30"),
-            "igi_drilling_depth": clean_param(igi_drilling_depth, "5"),
-            "igi_boreholes": clean_param(igi_boreholes, "4"),
-            "igi_sounding_points": clean_param(igi_sounding_points, "4"),
-            "igi_duration_days": clean_param(igi_duration_days, "35"),
+            "advance_percent": advance_percent,
+            "validity_days": validity_days,
+            "igi_drilling_depth": igi_drilling_depth,
+            "igi_boreholes": igi_boreholes,
+            "igi_sounding_points": igi_sounding_points,
+            "igi_duration_days": igi_duration_days,
             "igi_cost": format_cost(igi_cost),
-            "igdi_area_ha": clean_param(igdi_area_ha, "0"),
-            "igdi_scale": igdi_scale or "1:500",
-            "igdi_contour_interval": clean_param(igdi_contour_interval, "0.5"),
-            "igdi_duration_days": clean_param(igdi_duration_days, "50"),
-            "igdi_survey_days": clean_param(igdi_survey_days, "15"),
-            "igdi_coordination_days": clean_param(igdi_coordination_days, "35"),
+            "igdi_area_ha": igdi_area_ha,
+            "igdi_scale": igdi_scale,
+            "igdi_contour_interval": igdi_contour_interval,
+            "igdi_duration_days": igdi_duration_days,
+            "igdi_survey_days": igdi_survey_days,
+            "igdi_coordination_days": igdi_coordination_days,
             "igdi_cost": format_cost(igdi_cost),
             "igdi_survey_cost": format_cost(igdi_survey_cost),
             "igdi_coordination_cost": format_cost(igdi_coordination_cost),
             "igdi_report_cost": format_cost(igdi_report_cost),
-            "iei_area_ha": clean_param(iei_area_ha, "0"),
-            "iei_gamma_points": clean_param(iei_gamma_points, "0"),
-            "iei_noise_points": clean_param(iei_noise_points, "0"),
-            "iei_emi_points": clean_param(iei_emi_points, "0"),
-            "iei_soil_samples": clean_param(iei_soil_samples, "0"),
-            "iei_bio_samples": clean_param(iei_bio_samples, "0"),
-            "iei_rad_samples": clean_param(iei_rad_samples, "0"),
-            "iei_surface_water_samples": clean_param(iei_surface_water_samples, "0"),
-            "iei_sediment_samples": clean_param(iei_sediment_samples, "0"),
-            "iei_water_samples": clean_param(iei_water_samples, "0"),
-            "iei_water_boreholes": clean_param(iei_water_boreholes, "0"),
-            "iei_layered_samples_deep": clean_param(iei_layered_samples_deep, "0"),
-            "iei_deep_boreholes": clean_param(iei_deep_boreholes, "0"),
-            "iei_layered_samples_shallow": clean_param(iei_layered_samples_shallow, "0"),
-            "iei_shallow_boreholes": clean_param(iei_shallow_boreholes, "0"),
-            "iei_background_soil_samples": clean_param(iei_background_soil_samples, "0"),
-            "iei_agro_samples": clean_param(iei_agro_samples, "0"),
-            "iei_pits": clean_param(iei_pits, "0"),
-            "iei_duration_days": clean_param(iei_duration_days, "35"),
+            "iei_area_ha": iei_area_ha,
+            "iei_gamma_points": iei_gamma_points,
+            "iei_noise_points": iei_noise_points,
+            "iei_emi_points": iei_emi_points,
+            "iei_soil_samples": iei_soil_samples,
+            "iei_bio_samples": iei_bio_samples,
+            "iei_rad_samples": iei_rad_samples,
+            "iei_surface_water_samples": iei_surface_water_samples,
+            "iei_sediment_samples": iei_sediment_samples,
+            "iei_water_samples": iei_water_samples,
+            "iei_water_boreholes": iei_water_boreholes,
+            "iei_layered_samples_deep": iei_layered_samples_deep,
+            "iei_deep_boreholes": iei_deep_boreholes,
+            "iei_layered_samples_shallow": iei_layered_samples_shallow,
+            "iei_shallow_boreholes": iei_shallow_boreholes,
+            "iei_background_soil_samples": iei_background_soil_samples,
+            "iei_agro_samples": iei_agro_samples,
+            "iei_pits": iei_pits,
+            "iei_duration_days": iei_duration_days,
             "iei_cost": format_cost(iei_cost),
-            "igmi_route_km": clean_param(igmi_route_km, "0"),
-            "igmi_photo_count": clean_param(igmi_photo_count, "0"),
-            "igmi_wind_rose_count": clean_param(igmi_wind_rose_count, "0"),
-            "igmi_duration_days": clean_param(igmi_duration_days, "40"),
+            "igmi_route_km": igmi_route_km,
+            "igmi_photo_count": igmi_photo_count,
+            "igmi_wind_rose_count": igmi_wind_rose_count,
+            "igmi_duration_days": igmi_duration_days,
             "igmi_cost": format_cost(igmi_cost)
         }
 
