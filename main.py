@@ -9,7 +9,11 @@ app = FastAPI()
 # === Bitrix24 настройки ===
 WEBHOOK = "https://izyskaniya.bitrix24.ru/rest/13614/rj3pqolk1fiu6hfr/"
 DISK_FOLDER_ID = "1706930"
-KP_LINK_FIELD = "UF_CRM_1761672766812"  # Поле для сохранения ссылки на КП
+KP_LINK_FIELD = "UF_CRM_1761672766812"  # Поле для ссылки на КП
+
+def safe_str(value, default="0"):
+    """Заменяет пустую строку на значение по умолчанию"""
+    return value if value != "" else default
 
 def format_cost(cost_str):
     try:
@@ -188,53 +192,54 @@ async def generate_kp(
     igmi_cost: str = "0"
 ):
     try:
+        # Обработка пустых значений
         data = {
             "object_name": object_name,
             "address": address,
             "cadastral_number": cadastral_number or "—",
             "date": date or datetime.now().strftime("%d.%m.%Y"),
             "total_cost": format_cost(total_cost),
-            "advance_percent": advance_percent,
-            "validity_days": validity_days,
-            "igi_drilling_depth": igi_drilling_depth,
-            "igi_boreholes": igi_boreholes,
-            "igi_sounding_points": igi_sounding_points,
-            "igi_duration_days": igi_duration_days,
+            "advance_percent": safe_str(advance_percent, "50"),
+            "validity_days": safe_str(validity_days, "30"),
+            "igi_drilling_depth": safe_str(igi_drilling_depth, "5"),
+            "igi_boreholes": safe_str(igi_boreholes, "4"),
+            "igi_sounding_points": safe_str(igi_sounding_points, "4"),
+            "igi_duration_days": safe_str(igi_duration_days, "35"),
             "igi_cost": format_cost(igi_cost),
-            "igdi_area_ha": igdi_area_ha,
-            "igdi_scale": igdi_scale,
-            "igdi_contour_interval": igdi_contour_interval,
-            "igdi_duration_days": igdi_duration_days,
-            "igdi_survey_days": igdi_survey_days,
-            "igdi_coordination_days": igdi_coordination_days,
+            "igdi_area_ha": safe_str(igdi_area_ha, "0"),
+            "igdi_scale": igdi_scale or "1:500",
+            "igdi_contour_interval": safe_str(igdi_contour_interval, "0.5"),
+            "igdi_duration_days": safe_str(igdi_duration_days, "50"),
+            "igdi_survey_days": safe_str(igdi_survey_days, "15"),
+            "igdi_coordination_days": safe_str(igdi_coordination_days, "35"),
             "igdi_cost": format_cost(igdi_cost),
             "igdi_survey_cost": format_cost(igdi_survey_cost),
             "igdi_coordination_cost": format_cost(igdi_coordination_cost),
             "igdi_report_cost": format_cost(igdi_report_cost),
-            "iei_area_ha": iei_area_ha,
-            "iei_gamma_points": iei_gamma_points,
-            "iei_noise_points": iei_noise_points,
-            "iei_emi_points": iei_emi_points,
-            "iei_soil_samples": iei_soil_samples,
-            "iei_bio_samples": iei_bio_samples,
-            "iei_rad_samples": iei_rad_samples,
-            "iei_surface_water_samples": iei_surface_water_samples,
-            "iei_sediment_samples": iei_sediment_samples,
-            "iei_water_samples": iei_water_samples,
-            "iei_water_boreholes": iei_water_boreholes,
-            "iei_layered_samples_deep": iei_layered_samples_deep,
-            "iei_deep_boreholes": iei_deep_boreholes,
-            "iei_layered_samples_shallow": iei_layered_samples_shallow,
-            "iei_shallow_boreholes": iei_shallow_boreholes,
-            "iei_background_soil_samples": iei_background_soil_samples,
-            "iei_agro_samples": iei_agro_samples,
-            "iei_pits": iei_pits,
-            "iei_duration_days": iei_duration_days,
+            "iei_area_ha": safe_str(iei_area_ha, "0"),
+            "iei_gamma_points": safe_str(iei_gamma_points, "0"),
+            "iei_noise_points": safe_str(iei_noise_points, "0"),
+            "iei_emi_points": safe_str(iei_emi_points, "0"),
+            "iei_soil_samples": safe_str(iei_soil_samples, "0"),
+            "iei_bio_samples": safe_str(iei_bio_samples, "0"),
+            "iei_rad_samples": safe_str(iei_rad_samples, "0"),
+            "iei_surface_water_samples": safe_str(iei_surface_water_samples, "0"),
+            "iei_sediment_samples": safe_str(iei_sediment_samples, "0"),
+            "iei_water_samples": safe_str(iei_water_samples, "0"),
+            "iei_water_boreholes": safe_str(iei_water_boreholes, "0"),
+            "iei_layered_samples_deep": safe_str(iei_layered_samples_deep, "0"),
+            "iei_deep_boreholes": safe_str(iei_deep_boreholes, "0"),
+            "iei_layered_samples_shallow": safe_str(iei_layered_samples_shallow, "0"),
+            "iei_shallow_boreholes": safe_str(iei_shallow_boreholes, "0"),
+            "iei_background_soil_samples": safe_str(iei_background_soil_samples, "0"),
+            "iei_agro_samples": safe_str(iei_agro_samples, "0"),
+            "iei_pits": safe_str(iei_pits, "0"),
+            "iei_duration_days": safe_str(iei_duration_days, "35"),
             "iei_cost": format_cost(iei_cost),
-            "igmi_route_km": igmi_route_km,
-            "igmi_photo_count": igmi_photo_count,
-            "igmi_wind_rose_count": igmi_wind_rose_count,
-            "igmi_duration_days": igmi_duration_days,
+            "igmi_route_km": safe_str(igmi_route_km, "0"),
+            "igmi_photo_count": safe_str(igmi_photo_count, "0"),
+            "igmi_wind_rose_count": safe_str(igmi_wind_rose_count, "0"),
+            "igmi_duration_days": safe_str(igmi_duration_days, "40"),
             "igmi_cost": format_cost(igmi_cost)
         }
 
@@ -254,7 +259,6 @@ async def generate_kp(
             old_prefix = prefix_map.get(name, "1.")
             new_text = text.replace(old_prefix, f"{idx}.")
 
-            # Замена упоминаний "п.1", "п.2" и т.д.
             for old_num in ["1", "2", "3", "4"]:
                 new_text = new_text.replace(f"п.{old_num}", f"п.{idx}")
                 new_text = new_text.replace(f"п. {old_num}", f"п. {idx}")
@@ -288,7 +292,7 @@ async def generate_kp(
         output_path = f"/tmp/{filename}"
         doc.save(output_path)
 
-        # === Загрузка в Bitrix24 ===
+        # Загрузка в Bitrix24
         async with httpx.AsyncClient(timeout=30) as client:
             prep_resp = await client.post(
                 f"{WEBHOOK}disk.folder.uploadfile.json",
@@ -313,7 +317,7 @@ async def generate_kp(
 
         download_url = f"https://izyskaniya.bitrix24.ru/disk/showFile/{file_id}/?filename={filename}"
 
-        # === Сохранение ссылки в сделку ===
+        # Сохранение ссылки в сделку
         async with httpx.AsyncClient(timeout=30) as client:
             update_resp = await client.post(
                 f"{WEBHOOK}crm.deal.update.json",
