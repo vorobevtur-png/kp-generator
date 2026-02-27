@@ -316,14 +316,14 @@ async def generate_kp(
         # Сохранение ссылки в сделку
         async with httpx.AsyncClient(timeout=30) as client:
             update_resp = await client.post(
-                f"{WEBHOOK}crm.deal.update.json",
-                json={
-                    "id": deal_id,
-                    "fields": {
-                        KP_LINK_FIELD: download_url
-                    }
-                }
-            )
+    f"{WEBHOOK}crm.deal.update.json",
+    json={
+        "id": deal_id,
+        "FIELDS": {  # ← ЗАГЛАВНЫМИ БУКВАМИ!
+            KP_LINK_FIELD: download_url
+        }
+    }
+)
             update_data = update_resp.json()
             if "result" not in update_data:
                 raise HTTPException(status_code=500, detail="Не удалось сохранить ссылку в сделку")
