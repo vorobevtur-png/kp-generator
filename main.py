@@ -9,7 +9,7 @@ app = FastAPI()
 # === Bitrix24 настройки ===
 WEBHOOK = "https://izyskaniya.bitrix24.ru/rest/13614/rj3pqolk1fiu6hfr/"
 DISK_FOLDER_ID = "1706930"
-KP_LINK_FIELD = "UF_CRM_1772194305"  # Поле для ссылки на КП
+KP_LINK_FIELD = "UF_CRM_1761672766812"  # Поле для ссылки на КП
 
 def format_cost(cost_str):
     try:
